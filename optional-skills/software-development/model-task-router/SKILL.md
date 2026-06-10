@@ -1,6 +1,6 @@
 ---
 name: model-task-router
-description: Classify tasks and route to the best-fit model. Coding-heavy → delegate_task with a coding model, orchestration → current model directly, mechanical → delegate_task with default subagent model. Configure your preferred coding and architecture models below.
+description: Classify tasks and route to the best-fit model. Coding-heavy → terminal-spawned agent, orchestration → current model directly, mechanical → delegate_task. Configure your preferred coding and architecture models below.
 version: 2.0.0
 author: Sugumaran Balasubramaniyan (https://github.com/Sugumaran-Balasubramaniyan)
 license: MIT
@@ -60,8 +60,8 @@ Source: [DeepSWE leaderboard](https://deepswe.datacurve.ai/), [explainx.ai DeepS
 
 | Task Category | How | Why |
 |--------------|-----|-----|
-| **Code Generation** (implement, fix, refactor, PR, tests) | `delegate_task` with coding model | Coding models have proven DeepSWE results |
-| **Hard Architecture** (system design, complex debugging, security) | `delegate_task` with architecture model | Highest reasoning capability |
+| **Code Generation** (implement, fix, refactor, PR, tests) | terminal-spawn `hermes chat` with coding model | Coding models have proven DeepSWE results |
+| **Hard Architecture** (system design, complex debugging, security) | terminal-spawn `hermes chat` with architecture model | Highest reasoning capability |
 | **Orchestration** (tools, shell, file ops, diagnostics) | Current model directly | Tool-calling efficiency |
 | **Research** (web search, docs, analysis, planning) | Current model directly | Reasoning + web tools inline |
 | **Mechanical** (grep, find, run tests, simple edits) | `delegate_task` (default subagent model) | Fast, cheap, delegated |
@@ -101,12 +101,12 @@ User says: "..."
 ├─ Keywords: "implement", "build", "create", "write code", "fix bug",
 │           "refactor", "add feature", "PR", "patch"
 │  AND task modifies or creates source files
-│  → ROUTE: Coding → delegate_task(model=coding_model, toolsets=[terminal, file, web])
+│  → ROUTE: Coding → terminal-spawn hermes chat --model coding_model
 │
 ├─ Keywords: "architecture", "design system", "how would you structure",
 │           "security review", "complex debugging"
 │  AND task is high-stakes, multi-system, or multi-file
-│  → ROUTE: Architecture → delegate_task(model=architecture_model, toolsets=[terminal, file, web])
+│  → ROUTE: Architecture → terminal-spawn hermes chat --model architecture_model
 │
 ├─ Keywords: "search for", "find all", "grep", "list files",
 │           "run tests", "check if", "what's the content of"
@@ -131,29 +131,35 @@ This forces direct handling even though "fix" would normally trigger a coding di
 
 ## Dispatch Mechanism
 
-### For Coding Tasks → delegate_task
+**Important:** `delegate_task` does not currently support per-task model override ([issue #18591](https://github.com/NousResearch/hermes-agent/issues/18591)). To dispatch a task to a specific model, use `terminal` to spawn a fresh agent with `hermes chat`. For mechanical tasks, `delegate_task` with the default subagent model is correct.
 
-```python
-delegate_task(
-    goal="<full task description>",
-    context="""<file paths, error messages, constraints, existing code, project context>""",
-    model="openrouter/openai/gpt-5.4",   # your coding_model
-    toolsets=["terminal", "file", "web"]
-)
+### For Coding Tasks → terminal-spawned agent
+
+```bash
+# Spawn a fresh agent with the coding model
+hermes chat -q "<full task description with file paths and context>" \
+  --model openrouter/openai/gpt-5.4 \
+  --provider openrouter \
+  --toolsets terminal,file,web
 ```
 
-### For Architecture Tasks → delegate_task
+**IMPORTANT:** When dispatching a coding task:
+1. Include ALL relevant context in the `-q` string: file paths, error messages, constraints, existing code snippets
+2. Set a generous timeout: coding tasks can take 5-15 minutes
+3. If the task is large, spawn in background and poll: `terminal(background=true, notify_on_complete=true)`
+4. Verify the spawned agent's results before reporting to the user — agents can hallucinate completion
+5. If the spawned agent fails, try once more with more specific instructions, then report the blocker
 
-```python
-delegate_task(
-    goal="<architecture question with full context>",
-    context="""<system description, constraints, trade-offs to evaluate>""",
-    model="openrouter/openai/gpt-5.5",   # your architecture_model
-    toolsets=["terminal", "file", "web"]
-)
+### For Architecture Tasks → terminal-spawned agent
+
+```bash
+hermes chat -q "<full architecture question with context>" \
+  --model openrouter/openai/gpt-5.5 \
+  --provider openrouter \
+  --toolsets terminal,file,web
 ```
 
-### For Mechanical Tasks → delegate_task (default model)
+### For Mechanical Tasks → delegate_task (default subagent model)
 
 ```python
 delegate_task(
@@ -163,6 +169,8 @@ delegate_task(
 )
 ```
 
+Good for: searching codebase for patterns, running test suites, simple file modifications, finding and listing files.
+
 ### For Orchestration/Research → Handle Directly
 
 Use your current model inline. Do NOT delegate or spawn. Handle tool calls directly.
@@ -171,26 +179,28 @@ See also: `subagent-driven-development` skill for the full delegation workflow (
 
 ## Dispatch Checklist
 
-When delegating a coding or architecture task:
+When spawning a coding or architecture task via `hermes chat`:
 
-1. **Pack all context**: The subagent has no memory of your conversation. Include file paths, error messages, constraints, and relevant code.
-2. **Verify results**: Subagents self-report "completed" when they haven't. Always read the modified file or run the test before reporting to the user.
-3. **Retry once if needed**: If the subagent fails, try once more with more specific instructions, then report the blocker.
+1. **Pack all context**: The spawned agent has no memory of your conversation. Include file paths, error messages, constraints, and relevant code.
+2. **Verify results**: Agents self-report "completed" when they haven't. Always read the modified file or run the test before reporting to the user.
+3. **Retry once if needed**: If the spawned agent fails, try once more with more specific instructions, then report the blocker.
 4. **Announce the routing**: Short message like "Routing to GPT-5.4 for implementation..." keeps the user informed.
 
 ## Anti-Patterns
 
 - **Do NOT delegate orchestration.** The current model handles tool-calling; delegation adds overhead for no benefit.
-- **Do NOT delegate one-liner fixes.** Use `[route: direct]` for trivial edits.
-- **Do NOT skip verification.** Subagents can hallucinate completion. Read files, run tests, confirm.
-- **Do NOT delegate without context.** Pack every relevant detail into the `context` field.
+- **Do NOT spawn agents for one-liner fixes.** Use `[route: direct]` for trivial edits.
+- **Do NOT skip verification.** Spawned agents can hallucinate completion. Read files, run tests, confirm.
+- **Do NOT spawn without context.** Pack every relevant detail into the `-q` string.
 - **Do NOT use the architecture model for routine coding.** It's overkill; save it for hard problems.
 
 ## Pitfalls
 
-- **`delegate_task` model parameter**: Only supported for agents with the delegation toolset. If your deployment doesn't support per-task model overrides, coding and architecture tasks will use your default subagent model — still useful, but won't get the specialized model benefit.
-- **Rate limits**: Multiple models share provider-level rate limits. If one dispatch fails, try the other or fall back to the current model.
-- **Context budget**: Each `delegate_task` summary adds tokens. Don't delegate trivial tasks; use `[route: direct]` instead.
+- **`delegate_task` has no model parameter**: Per-task model override on `delegate_task` is not yet implemented ([issue #18591](https://github.com/NousResearch/hermes-agent/issues/18591)). Use `hermes chat -q --model ...` via `terminal()` for model-specific dispatch.
+- **Spawned agents have no session memory**: When using `hermes chat`, the spawned process starts fresh. Pack ALL context into the `-q` string — file paths, error messages, constraints, relevant code.
+- **Background processes need monitoring**: For long tasks, use `terminal(background=true, notify_on_complete=true)` and verify results with `process(action='wait')` or `process(action='poll')`.
+- **Rate limits**: GPT-5.4 and GPT-5.5 share OpenAI rate limits via OpenRouter. If one dispatch fails, try the other or fall back to the current model.
+- **Context budget**: Each spawned agent session adds cost and latency. Don't dispatch trivial tasks; use `[route: direct]` instead.
 
 ## Related Hermes Issues
 
