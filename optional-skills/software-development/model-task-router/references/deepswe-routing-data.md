@@ -1,8 +1,10 @@
 # DeepSWE Routing Data — Why Model Routing Matters
 
+> **Updated 2026-06-10**: Cost figures corrected based on [DeepSWE issue #21](https://github.com/datacurve-ai/deep-swe/issues/21) — DeepSeek's cache-hit pricing was not applied, inflating costs 4-14×. The solve-rate data (8%) is unaffected. The routing recommendation stands, but the justification shifts from cost to reliability.
+
 ## The Evidence
 
-DeepSWE (deepswe.datacurve.ai) is the only contamination-free, real-complexity coding benchmark. Tasks are written from scratch, require 5.5× more code than SWE-bench Pro, and span 91 repositories across 5 languages.
+DeepSWE ([deepswe.datacurve.ai](https://deepswe.datacurve.ai)) is the only contamination-free, real-complexity coding benchmark. Tasks are written from scratch, require 5.5× more code than SWE-bench Pro, and span 91 repositories across 5 languages.
 
 ## Key Finding: Models Collapse on Real Engineering Tasks
 
@@ -14,20 +16,23 @@ DeepSWE (deepswe.datacurve.ai) is the only contamination-free, real-complexity c
 | MiniMax M3 | 59.0% | 20% | **−39** |
 | DeepSeek V4-Pro | 55.4% | **8%** | **−47** |
 
-**Budget models that look competitive on SWE-bench Pro collapse on real tasks.** V4-Pro drops from 55% to 8%. M3 drops from 59% to 20%. The gap between "good enough" and "actually works" is invisible on contaminated benchmarks.
+## Cost Analysis (Cache-Adjusted, June 2026)
 
-## Cost per Solved Task (DeepSWE)
+DeepSeek V4-Pro's actual pricing includes cache-hit rates at $0.0036/M (99.2% off cache-miss). DeepSWE's reported costs billed all tokens at the miss rate. Corrected:
 
-| Model | Pass@1 | Avg Cost/Task | Cost per Solve |
-|-------|:------:|:------------:|:--------------:|
-| GPT-5.4 | 56% | $4.38 | **$7.82** |
-| GPT-5.5 | 70% | $6.61 | $9.44 |
-| GPT-5.4-Mini | 24% | $2.08 | $8.67 |
-| Claude Opus 4.7 | 54% | $18.19 | $33.69 |
-| MiniMax M3 | 20% | $5.57 | $27.85 |
-| DeepSeek V4-Pro | 8% | $4.22 | **$52.75** |
+| Model | DeepSWE | Cost/Task | Cost/Solve | Attempts/Solve |
+|-------|:-------:|:---------:|:----------:|:--------------:|
+| GPT-5.5 | **70%** | $6.61 | $9.44 | 1.4 |
+| GPT-5.4 | **56%** | $4.38 | **$7.82** | 1.8 |
+| GPT-5.4-Mini | 24% | $2.08 | $8.67 | 4.2 |
+| DeepSeek V4-Pro | **8%** | **$0.30** | **$3.75** | 12.5 |
 
-V4-Pro is 6.7× more expensive per solved task than GPT-5.4 despite being 17× cheaper per token — because it barely solves anything.
+**Key insight:** V4-Pro costs the least per eventual solve ($3.75), but requires **12.5× more attempts** than GPT-5.4 (1.8). The routing decision isn't about cost — it's about reliability. A task routed to V4-Pro fails 92% of the time on first attempt.
+
+### Additional Concerns (from DeepSWE Issue #21)
+
+- **No effort tuning**: V4-Pro was run with `reasoning_effort: null` while all other models had tuned effort levels (xhigh, max, medium). Its 8% score may improve with proper tuning.
+- **OpenRouter privacy guardrail**: OpenRouter blocks DeepSeek by default (data-training concern). Benchmark tests may have failed from 404 errors, not model capability.
 
 ## Terminal-Bench (Agentic CLI)
 
@@ -36,14 +41,21 @@ V4-Pro is 6.7× more expensive per solved task than GPT-5.4 despite being 17× c
 | GPT-5.5 | 82.7% | $30.00 |
 | DeepSeek V4-Pro | 67.9% | $0.87 |
 
-V4-Pro is competitive at tool orchestration. The routing strategy preserves V4-Pro for CLI/tool work while dispatching coding to GPT-5.4+.
+## The Routing Decision
+
+| Task Type | Route to | Why |
+|-----------|----------|-----|
+| Code Generation | GPT-5.4 | 56% success, 1.8 attempts — gets it done |
+| Architecture | GPT-5.5 | 70% success, 1.4 attempts — best-in-class |
+| Orchestration | V4-Pro | 67.9% Terminal-Bench, cheap, reliable at tools |
+| Mechanical | GPT-5.4-Mini | 24% success, delegated, fast |
+
+V4-Pro should not code because it fails 92% of real coding tasks — not because it costs more per solve.
 
 ## Sources
 
 - DeepSWE Leaderboard: https://deepswe.datacurve.ai/
+- DeepSWE Issue #21 (cost correction): https://github.com/datacurve-ai/deep-swe/issues/21
 - DeepSWE Blog: https://deepswe.datacurve.ai/blog
-- SWE-bench Pro Leaderboard: https://codingfleet.com/blog/swe-bench-pro-leaderboard-2026/
-- DeepSeek V4 Technical Report: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf
-- DeepSeek V4 Blog: https://huggingface.co/blog/deepseekv4
+- DeepSeek V4 Technical Report: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro
 - Kilo Leaderboard: https://kilo.ai/leaderboard
-- Vellum LLM Leaderboard: https://www.vellum.ai/llm-leaderboard

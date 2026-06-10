@@ -30,9 +30,11 @@ DeepSWE ([deepswe.datacurve.ai](https://deepswe.datacurve.ai)) — the only cont
 | DeepSeek V4-Pro | 55.4% | **8%** | **−47** |
 | MiniMax M3 | 59.0% | 20% | −39 |
 
-Models that look identical on public benchmarks (55-60% Pro) diverge by **47 points** on real engineering tasks. V4-Pro costs **$52.75 per solved task** vs GPT-5.4 at **$7.82** — despite being 17× cheaper per token — because it solves almost nothing.
+Models that look identical on public benchmarks (55-60% Pro) diverge by **47 points** on real engineering tasks. V4-Pro requires **12.5 attempts per success** vs GPT-5.4 at **1.8 attempts** — it fails 92% of coding tasks on the first try.
 
 But V4-Pro is excellent at tool orchestration (Terminal-Bench 67.9%, $0.87/M). The optimal strategy is **task-based routing**: orchestration on V4-Pro, coding on GPT-5.4+.
+
+> **Note:** Cost figures are cache-adjusted per [DeepSWE issue #21](https://github.com/datacurve-ai/deep-swe/issues/21). V4-Pro's real cost is $0.30/task ($3.75/solve), not the previously reported $4.22/task. The routing recommendation stands — the issue is reliability, not cost.
 
 Full data: `references/deepswe-routing-data.md`
 
@@ -44,11 +46,11 @@ Load this skill at session start for any session involving mixed task types (cod
 
 | Task Category | Model | DeepSWE | Why |
 |--------------|-------|:-----:|-----|
-| **Code Generation** (implement, fix, refactor, write tests, PR) | `openrouter/openai/gpt-5.4` | 56% | 7× V4-Pro on real coding |
-| **Hard Architecture** (system design, complex debugging, security audit) | `openrouter/openai/gpt-5.5` | 70% | Best-in-class reasoning + coding |
-| **Orchestration** (tools, shell, file ops, navigation, diagnostics) | Current (V4-Pro) | 8% | Terminal-Bench 67.9%, $0.87/M |
+| **Code Generation** (implement, fix, refactor, write tests, PR) | `openrouter/openai/gpt-5.4` | 56% | 7× V4-Pro success rate, 1.8 attempts/solve |
+| **Hard Architecture** (system design, complex debugging, security audit) | `openrouter/openai/gpt-5.5` | 70% | Best-in-class, 1.4 attempts/solve |
+| **Orchestration** (tools, shell, file ops, navigation, diagnostics) | Current (V4-Pro) | 8% | Terminal-Bench 67.9%, $0.87/M — V4-Pro's strength |
 | **Research** (web search, documentation, analysis, planning) | Current (V4-Pro) | — | Good reasoning, cheap |
-| **Mechanical** (grep, find, list files, run tests, simple edits) | Subagent auto (GPT-5.4-Mini) | 24% | delegate_task default |
+| **Mechanical** (grep, find, list files, run tests, simple edits) | Subagent auto (GPT-5.4-Mini) | 24% | 4.2 attempts/solve, delegated |
 
 ## Decision Tree
 
