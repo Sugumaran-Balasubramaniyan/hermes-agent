@@ -43,7 +43,7 @@ DeepSWE (real-world coding, contamination-free) and Terminal-Bench (agentic CLI)
 | Gemini 3.5 Flash | — | 28% | Budget-aware option |
 | GPT-5.4-Mini | — | 24% | Fast, cheap, delegated |
 | Kimi K2.6 | — | 24% | Budget option |
-| DeepSeek V4-Pro | 55.4% | ~8%* | See caveats below |
+| DeepSeek V4-Pro | 55.4% | ~8%* | See caveats above |
 
 *\*V4-Pro was run at default effort (no tuning) and may have been affected by OpenRouter guardrail 404s. Score directionally suggests lower coding throughput, but magnitude is uncertain. Community replications report 5–8%. Awaiting re-run with proper effort tuning.*
 
@@ -90,7 +90,7 @@ architecture_model: openrouter/openai/gpt-5.5
 ## Decision Tree
 
 Priority order: Coding > Architecture > Mechanical > Research > Orchestration.
-First match wins. User can override by prefixing their message with `[route: <category>]`.
+First match wins; ties broken left-to-right by priority order. User can override by prefixing their message with `[route: <category>]`.
 
 ```
 User says: "..."
